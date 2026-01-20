@@ -5,13 +5,14 @@ const WIDTH = canvas.width;
 const HEIGHT = canvas.height;
 
 // UI
-const titleScreen = document.getElementById("title-screen");
-const scoreboard = document.getElementById("scoreboard");
-const scoreP1El = document.getElementById("score-p1");
-const scoreP2El = document.getElementById("score-p2");
-const modeLabelEl = document.getElementById("mode-label");
-const btnSolo = document.getElementById("btn-solo");
-const btnVersus = document.getElementById("btn-versus");
+const menu = document.getElementById("menu");
+const scoreUI = document.getElementById("score");
+const p1UI = document.getElementById("p1");
+const p2UI = document.getElementById("p2");
+const modeUI = document.getElementById("mode");
+
+document.getElementById("btn-solo").onclick = () => startGame("solo");
+document.getElementById("btn-versus").onclick = () => startGame("versus");
 
 // Sons
 const sndScore = document.getElementById("snd-score");
@@ -19,62 +20,41 @@ const sndBounce = document.getElementById("snd-bounce");
 const sndStart = document.getElementById("snd-start");
 
 // États
-let gameState = "menu"; // "menu" | "game"
-let gameMode = "versus"; // "versus" | "solo"
+let gameState = "menu";
+let gameMode = "versus";
 
 // Joueurs
 const player1 = {
-  x: 200,
-  y: HEIGHT - 150,
-  width: 40,
-  height: 80,
-  colorBody: "#f4b400", // maillot
-  colorShort: "#ffecb3",
-  vx: 0,
-  vy: 0,
+  x: 200, y: HEIGHT - 150,
+  w: 40, h: 80,
+  vx: 0, vy: 0,
   onGround: false,
-  facing: 1
+  shirt: "#f4b400",
+  short: "#ffecb3"
 };
 
 const player2 = {
-  x: WIDTH - 240,
-  y: HEIGHT - 150,
-  width: 40,
-  height: 80,
-  colorBody: "#4285f4",
-  colorShort: "#bbdefb",
-  vx: 0,
-  vy: 0,
+  x: WIDTH - 240, y: HEIGHT - 150,
+  w: 40, h: 80,
+  vx: 0, vy: 0,
   onGround: false,
-  facing: -1
+  shirt: "#4285f4",
+  short: "#bbdefb"
 };
 
 // Ballon
 const ball = {
-  x: WIDTH / 2,
-  y: HEIGHT / 2,
-  radius: 12,
-  vx: 0,
-  vy: 0
+  x: WIDTH / 2, y: HEIGHT / 2,
+  r: 12,
+  vx: 0, vy: 0
 };
 
 const gravity = 0.6;
 const friction = 0.85;
 
 // Paniers
-const hoopLeft = {
-  x: 80,
-  y: 140,
-  width: 60,
-  height: 10
-};
-
-const hoopRight = {
-  x: WIDTH - 140,
-  y: 140,
-  width: 60,
-  height: 10
-};
+const hoopLeft = { x: 80, y: 140, w: 60, h: 10 };
+const hoopRight = { x: WIDTH - 140, y: 140, w: 60, h: 10 };
 
 // Score
 let scoreP1 = 0;
@@ -82,262 +62,198 @@ let scoreP2 = 0;
 
 // Input
 const keys = {};
-window.addEventListener("keydown", (e) => {
-  keys[e.key] = true;
-});
-window.addEventListener("keyup", (e) => {
-  keys[e.key] = false;
-});
+window.onkeydown = e => keys[e.key] = true;
+window.onkeyup = e => keys[e.key] = false;
 
-// Boutons menu
-btnSolo.addEventListener("click", () => {
-  gameMode = "solo";
-  startGame();
-});
-
-btnVersus.addEventListener("click", () => {
-  gameMode = "versus";
-  startGame();
-});
-
-function startGame() {
+// Démarrer le jeu
+function startGame(mode) {
+  gameMode = mode;
   gameState = "game";
-  titleScreen.classList.add("hidden");
-  scoreboard.classList.remove("hidden");
-  modeLabelEl.textContent = gameMode === "solo" ? "Mode Solo" : "2 Joueurs";
+
+  menu.classList.add("hidden");
+  scoreUI.classList.remove("hidden");
+
+  modeUI.textContent = mode === "solo" ? "Mode Solo" : "2 Joueurs";
+
   resetPositions();
-  if (sndStart) sndStart.play().catch(() => {});
+
+  sndStart.play().catch(() => {});
 }
 
-function resetPositions(scoredBy = null) {
+// Reset après un panier
+function resetPositions() {
   player1.x = 200;
   player1.y = HEIGHT - 150;
-  player1.vx = 0;
-  player1.vy = 0;
-  player1.onGround = false;
+  player1.vx = player1.vy = 0;
 
   player2.x = WIDTH - 240;
   player2.y = HEIGHT - 150;
-  player2.vx = 0;
-  player2.vy = 0;
-  player2.onGround = false;
+  player2.vx = player2.vy = 0;
 
   ball.x = WIDTH / 2;
   ball.y = HEIGHT / 2;
-  ball.vx = 0;
-  ball.vy = 0;
-
-  if (scoredBy === "p1") {
-    ball.vx = 4;
-  } else if (scoredBy === "p2") {
-    ball.vx = -4;
-  }
+  ball.vx = ball.vy = 0;
 }
 
-function updatePlayer(player, leftKey, rightKey, jumpKey, isAI = false) {
+// Mise à jour joueur
+function updatePlayer(p, left, right, jump, isAI = false) {
   if (!isAI) {
-    if (keys[leftKey]) {
-      player.vx = -5;
-      player.facing = -1;
-    } else if (keys[rightKey]) {
-      player.vx = 5;
-      player.facing = 1;
-    } else {
-      player.vx *= friction;
-    }
+    if (keys[left]) p.vx = -5;
+    else if (keys[right]) p.vx = 5;
+    else p.vx *= friction;
 
-    if (keys[jumpKey] && player.onGround) {
-      player.vy = -12;
-      player.onGround = false;
+    if (keys[jump] && p.onGround) {
+      p.vy = -12;
+      p.onGround = false;
     }
   } else {
-    // IA simple : suit le ballon horizontalement, saute parfois
-    const targetX = ball.x;
-    if (targetX < player.x) {
-      player.vx = -4;
-      player.facing = -1;
-    } else if (targetX > player.x + player.width) {
-      player.vx = 4;
-      player.facing = 1;
-    } else {
-      player.vx *= friction;
-    }
+    // IA simple
+    if (ball.x < p.x) p.vx = -4;
+    else if (ball.x > p.x + p.w) p.vx = 4;
+    else p.vx *= friction;
 
-    if (ball.y < player.y && player.onGround && Math.random() < 0.02) {
-      player.vy = -12;
-      player.onGround = false;
+    if (ball.y < p.y && p.onGround && Math.random() < 0.02) {
+      p.vy = -12;
+      p.onGround = false;
     }
   }
 
-  player.vy += gravity;
+  p.vy += gravity;
 
-  player.x += player.vx;
-  player.y += player.vy;
+  p.x += p.vx;
+  p.y += p.vy;
 
-  if (player.y + player.height > HEIGHT - 40) {
-    player.y = HEIGHT - 40 - player.height;
-    player.vy = 0;
-    player.onGround = true;
+  if (p.y + p.h > HEIGHT - 40) {
+    p.y = HEIGHT - 40 - p.h;
+    p.vy = 0;
+    p.onGround = true;
   }
 
-  if (player.x < 0) player.x = 0;
-  if (player.x + player.width > WIDTH) player.x = WIDTH - player.width;
+  if (p.x < 0) p.x = 0;
+  if (p.x + p.w > WIDTH) p.x = WIDTH - p.w;
 }
 
+// Mise à jour ballon
 function updateBall() {
   ball.vy += gravity;
   ball.x += ball.vx;
   ball.y += ball.vy;
 
-  if (ball.y + ball.radius > HEIGHT - 40) {
-    ball.y = HEIGHT - 40 - ball.radius;
+  if (ball.y + ball.r > HEIGHT - 40) {
+    ball.y = HEIGHT - 40 - ball.r;
     ball.vy *= -0.6;
     ball.vx *= 0.9;
-    if (sndBounce) sndBounce.play().catch(() => {});
+    sndBounce.play().catch(() => {});
   }
 
-  if (ball.x - ball.radius < 0) {
-    ball.x = ball.radius;
+  if (ball.x - ball.r < 0) {
+    ball.x = ball.r;
     ball.vx *= -0.8;
   }
-  if (ball.x + ball.radius > WIDTH) {
-    ball.x = WIDTH - ball.radius;
+  if (ball.x + ball.r > WIDTH) {
+    ball.x = WIDTH - ball.r;
     ball.vx *= -0.8;
   }
 }
 
-function rectCircleCollide(player, ball) {
-  const closestX = Math.max(player.x, Math.min(ball.x, player.x + player.width));
-  const closestY = Math.max(player.y, Math.min(ball.y, player.y + player.height));
+// Collision joueur ↔ ballon
+function collide(p) {
+  const cx = Math.max(p.x, Math.min(ball.x, p.x + p.w));
+  const cy = Math.max(p.y, Math.min(ball.y, p.y + p.h));
 
-  const dx = ball.x - closestX;
-  const dy = ball.y - closestY;
+  const dx = ball.x - cx;
+  const dy = ball.y - cy;
 
-  return dx * dx + dy * dy < ball.radius * ball.radius;
+  if (dx * dx + dy * dy < ball.r * ball.r) {
+    ball.vx = dx * 0.4;
+    ball.vy = dy * 0.4;
+  }
 }
 
-function handleCollisions() {
-  [player1, player2].forEach(player => {
-    if (rectCircleCollide(player, ball)) {
-      const dirX = ball.x - (player.x + player.width / 2);
-      const dirY = ball.y - (player.y + player.height / 2);
-      const length = Math.max(1, Math.hypot(dirX, dirY));
-
-      ball.vx = (dirX / length) * 10;
-      ball.vy = (dirY / length) * 8;
-    }
-  });
-}
-
+// Détection panier
 function checkScore() {
-  // Panier gauche (J2 marque)
+  // Panier gauche → J2 marque
   if (
     ball.x > hoopLeft.x &&
-    ball.x < hoopLeft.x + hoopLeft.width &&
-    ball.y - ball.radius < hoopLeft.y + hoopLeft.height &&
-    ball.y + ball.radius > hoopLeft.y
+    ball.x < hoopLeft.x + hoopLeft.w &&
+    ball.y > hoopLeft.y &&
+    ball.y < hoopLeft.y + hoopLeft.h
   ) {
     scoreP2++;
-    updateScoreUI();
-    if (sndScore) sndScore.play().catch(() => {});
-    resetPositions("p2");
+    p2UI.textContent = "J2 : " + scoreP2;
+    sndScore.play().catch(() => {});
+    resetPositions();
   }
 
-  // Panier droit (J1 marque)
+  // Panier droit → J1 marque
   if (
     ball.x > hoopRight.x &&
-    ball.x < hoopRight.x + hoopRight.width &&
-    ball.y - ball.radius < hoopRight.y + hoopRight.height &&
-    ball.y + ball.radius > hoopRight.y
+    ball.x < hoopRight.x + hoopRight.w &&
+    ball.y > hoopRight.y &&
+    ball.y < hoopRight.y + hoopRight.h
   ) {
     scoreP1++;
-    updateScoreUI();
-    if (sndScore) sndScore.play().catch(() => {});
-    resetPositions("p1");
+    p1UI.textContent = "J1 : " + scoreP1;
+    sndScore.play().catch(() => {});
+    resetPositions();
   }
 }
 
-function updateScoreUI() {
-  scoreP1El.textContent = `J1 : ${scoreP1}`;
-  scoreP2El.textContent = `J2 : ${scoreP2}`;
+// Dessin joueur
+function drawPlayer(p) {
+  // Tête
+  ctx.fillStyle = "#ffcc80";
+  ctx.beginPath();
+  ctx.arc(p.x + p.w / 2, p.y + 12, 12, 0, Math.PI * 2);
+  ctx.fill();
+
+  // Maillot
+  ctx.fillStyle = p.shirt;
+  ctx.fillRect(p.x, p.y + 20, p.w, p.h - 20);
+
+  // Short
+  ctx.fillStyle = p.short;
+  ctx.fillRect(p.x, p.y + p.h - 25, p.w, 25);
 }
 
+// Dessin ballon
+function drawBall() {
+  ctx.fillStyle = "#ff6f00";
+  ctx.beginPath();
+  ctx.arc(ball.x, ball.y, ball.r, 0, Math.PI * 2);
+  ctx.fill();
+}
+
+// Dessin terrain + paniers
 function drawCourt() {
   ctx.fillStyle = "#1f5f2b";
   ctx.fillRect(0, HEIGHT - 40, WIDTH, 40);
 
-  ctx.strokeStyle = "#fff";
-  ctx.lineWidth = 3;
-  ctx.beginPath();
-  ctx.moveTo(WIDTH / 2, 0);
-  ctx.lineTo(WIDTH / 2, HEIGHT - 40);
-  ctx.stroke();
-
-  // Paniers
-  ctx.fillStyle = "#ffffff";
-  ctx.fillRect(hoopLeft.x, hoopLeft.y, hoopLeft.width, hoopLeft.height);
-  ctx.fillRect(hoopRight.x, hoopRight.y, hoopRight.width, hoopRight.height);
-
-  // Supports paniers
-  ctx.strokeStyle = "#ffffff";
-  ctx.lineWidth = 4;
-  ctx.beginPath();
-  ctx.moveTo(hoopLeft.x + hoopLeft.width, hoopLeft.y + hoopLeft.height);
-  ctx.lineTo(hoopLeft.x + hoopLeft.width + 20, hoopLeft.y + 80);
-  ctx.stroke();
-
-  ctx.beginPath();
-  ctx.moveTo(hoopRight.x, hoopRight.y + hoopRight.height);
-  ctx.lineTo(hoopRight.x - 20, hoopRight.y + 80);
-  ctx.stroke();
+  ctx.fillStyle = "white";
+  ctx.fillRect(hoopLeft.x, hoopLeft.y, hoopLeft.w, hoopLeft.h);
+  ctx.fillRect(hoopRight.x, hoopRight.y, hoopRight.w, hoopRight.h);
 }
 
-function drawPlayer(player) {
-  // Corps (maillot)
-  ctx.fillStyle = player.colorBody;
-  ctx.fillRect(player.x, player.y + 20, player.width, player.height - 20);
-
-  // Short
-  ctx.fillStyle = player.colorShort;
-  ctx.fillRect(player.x, player.y + player.height - 25, player.width, 25);
-
-  // Tête
-  ctx.fillStyle = "#ffcc80";
-  ctx.beginPath();
-  ctx.arc(player.x + player.width / 2, player.y + 12, 12, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function drawBall() {
-  ctx.fillStyle = "#ff6f00";
-  ctx.beginPath();
-  ctx.arc(ball.x, ball.y, ball.radius, 0, Math.PI * 2);
-  ctx.fill();
-}
-
-function gameLoop() {
+// Boucle du jeu
+function loop() {
   ctx.clearRect(0, 0, WIDTH, HEIGHT);
 
   if (gameState === "game") {
-    const isSolo = gameMode === "solo";
-
-    updatePlayer(player1, "a", "d", "w", false);
-    updatePlayer(player2, "ArrowLeft", "ArrowRight", "ArrowUp", isSolo);
+    updatePlayer(player1, "a", "d", "w");
+    updatePlayer(player2, "ArrowLeft", "ArrowRight", "ArrowUp", gameMode === "solo");
 
     updateBall();
-    handleCollisions();
+    collide(player1);
+    collide(player2);
     checkScore();
 
     drawCourt();
     drawPlayer(player1);
     drawPlayer(player2);
     drawBall();
-  } else {
-    // menu : juste fond terrain
-    drawCourt();
   }
 
-  requestAnimationFrame(gameLoop);
+  requestAnimationFrame(loop);
 }
 
-gameLoop();
+loop();
